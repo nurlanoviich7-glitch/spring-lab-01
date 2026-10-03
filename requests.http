@@ -1,0 +1,66 @@
+@base = http://localhost:8085
+
+### List all three seeded books
+GET {{base}}/api/books
+Accept: application/json
+
+### Author fragment and limit
+GET {{base}}/api/books?author=Bloch&limit=1
+
+### Find one book
+GET {{base}}/api/books/1
+
+### A missing book is 404
+GET {{base}}/api/books/999
+
+### Create a book: 201 and Location /api/books/4 on a fresh start
+POST {{base}}/api/books
+Content-Type: application/json
+
+{"title":"Pro Spring 6","author":"Cosmina","year":2023}
+
+### Replace the new book: 200
+PUT {{base}}/api/books/4
+Content-Type: application/json
+
+{"title":"Pro Spring 6 Updated","author":"Cosmina Harrop","year":2024}
+
+### Delete it: 204
+DELETE {{base}}/api/books/4
+
+### Repeat deletion: 404
+DELETE {{base}}/api/books/4
+
+### Title-fragment search: ignores case
+GET {{base}}/api/books/search?title=JAVA
+
+### Empty search result: 200 and []
+GET {{base}}/api/books/search?title=NoSuchTitle
+
+### Non-numeric path ID: 400
+GET {{base}}/api/books/abc
+
+### Unknown URL: 404
+GET {{base}}/api/nothing
+
+### Wrong method for the collection: 405
+DELETE {{base}}/api/books
+
+### Wrong request media type: 415
+POST {{base}}/api/books
+Content-Type: text/plain
+
+This is not JSON.
+
+### Unsupported response media type: 406
+GET {{base}}/api/books
+Accept: application/xml
+
+### Form POST: 302, then browser GET 200 with one flash message
+POST {{base}}/books
+Content-Type: application/x-www-form-urlencoded
+
+title=Java+Precisely&author=Peter+Sestoft&year=2016
+
+### Refresh: GET does not create a duplicate
+GET {{base}}/books
