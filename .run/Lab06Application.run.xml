@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Lab06Application" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="kz.iitu.springlab.SpringLab01Application" />
+    <module name="spring-lab-01.main" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="SHORTEN_COMMAND_LINE" value="ARGS_FILE" />
+    <method v="2"><option name="Make" enabled="true" /></method>
+  </configuration>
+</component>

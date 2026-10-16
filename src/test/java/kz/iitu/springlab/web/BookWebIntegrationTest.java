@@ -82,7 +82,8 @@ class BookWebIntegrationTest {
         int initialCount = service.findAll(null).size();
         var posted = mvc.perform(post("/books")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("title", "Java Precisely").param("author", "Sestoft").param("year", "2016"))
+                        .param("title", "Java Precisely").param("author", "Sestoft").param("year", "2016")
+                        .param("genre", "PROGRAMMING"))
                 .andExpect(status().isFound())
                 .andExpect(redirectedUrl("/books"))
                 .andExpect(flash().attribute("message", "Book \"Java Precisely\" has been added"))
@@ -116,16 +117,20 @@ class BookWebIntegrationTest {
     }
 
     @Test
-    void invalidFormDataReturns400WithoutCreatingABook() throws Exception {
+    void invalidFormDataRedisplaysErrorsWithoutCreatingABook() throws Exception {
         mvc.perform(post("/books").contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("title", "Title").param("author", "Author").param("year", "abc"))
-                .andExpect(status().isBadRequest());
+                        .param("title", "Title").param("author", "Author").param("year", "abc")
+                        .param("genre", "PROGRAMMING"))
+                .andExpect(status().isOk()).andExpect(view().name("books/form"))
+                .andExpect(model().attributeHasFieldErrors("form", "year"));
         mvc.perform(post("/books").contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("title", " ").param("author", "Author").param("year", "2024"))
-                .andExpect(status().isBadRequest());
+                        .param("title", " ").param("author", "Author").param("year", "2024")
+                        .param("genre", "PROGRAMMING"))
+                .andExpect(status().isOk()).andExpect(model().attributeHasFieldErrors("form", "title"));
         mvc.perform(post("/books").contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("title", "Title").param("author", "Author").param("year", "10000"))
-                .andExpect(status().isBadRequest());
+                        .param("title", "Title").param("author", "Author").param("year", "10000")
+                        .param("genre", "PROGRAMMING"))
+                .andExpect(status().isOk()).andExpect(model().attributeHasFieldErrors("form", "year"));
         assertThat(service.findAll(null)).hasSize(3);
     }
 }

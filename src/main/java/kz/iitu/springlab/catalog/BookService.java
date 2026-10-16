@@ -28,6 +28,10 @@ public class BookService {
         return repository.findById(id);
     }
 
+    public Book requireById(long id) {
+        return repository.findById(id).orElseThrow(() -> new BookNotFoundException(id));
+    }
+
     public List<Book> searchByTitle(String title) {
         if (title == null || title.isBlank()) {
             return repository.findAll();

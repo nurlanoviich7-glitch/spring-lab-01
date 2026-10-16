@@ -6,8 +6,11 @@ import kz.iitu.springlab.catalog.BookService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.context.support.StaticMessageSource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.util.Locale;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -25,7 +28,11 @@ class BookRestControllerTest {
     @BeforeEach
     void setUp() {
         service = new BookService(new BookRepository());
-        mvc = MockMvcBuilders.standaloneSetup(new BookRestController(service)).build();
+        StaticMessageSource messages = new StaticMessageSource();
+        messages.addMessage("book.notFound", Locale.ENGLISH, "Book {0} was not found");
+        messages.addMessage("book.notFound.title", Locale.ENGLISH, "Book not found");
+        mvc = MockMvcBuilders.standaloneSetup(new BookRestController(service))
+                .setControllerAdvice(new ApiExceptionHandler(messages)).build();
     }
 
     @Test
@@ -53,7 +60,10 @@ class BookRestControllerTest {
         mvc.perform(get("/api/books/1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Effective Java"));
         mvc.perform(get("/api/books/999"))
-                .andExpect(status().isNotFound()).andExpect(content().string(""));
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.instance").value("/api/books/999"));
     }
 
     @Test

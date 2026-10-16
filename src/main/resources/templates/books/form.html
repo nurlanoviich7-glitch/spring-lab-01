@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{book.new}">New book</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
+</head>
+<body>
+<header class="topbar">
+    <a class="brand" th:href="@{/}" th:text="#{app.brand}">Open Shelf</a>
+    <nav th:attr="aria-label=#{nav.main}">
+        <a th:href="@{/books}" th:text="#{nav.catalogue}">Catalogue</a>
+        <a class="active" th:href="@{/books/new}" th:text="#{nav.new}">Add a book</a>
+        <a th:href="@{/api/books}" th:text="#{nav.api}">JSON API</a>
+    </nav>
+    <div class="languages" th:attr="aria-label=#{language.choose}">
+        <a th:href="@{/books/new(lang='en')}" lang="en" th:text="#{language.en}" th:classappend="${#locale.language == 'en'} ? 'selected' : ''">English</a>
+        <a th:href="@{/books/new(lang='ru')}" lang="ru" th:text="#{language.ru}" th:classappend="${#locale.language == 'ru'} ? 'selected' : ''">Русский</a>
+    </div>
+</header>
+<main class="container form-container">
+    <a class="back-link" th:href="@{/books}" th:text="#{book.back}">Back to catalogue</a>
+    <div class="page-heading"><div><p class="eyebrow" th:text="#{book.new.eyebrow}">GROW THE COLLECTION</p><h1 th:text="#{book.new}">New book</h1><p class="intro" th:text="#{book.new.intro}">Add a title to your collection.</p></div></div>
+    <form th:action="@{/books}" th:object="${form}" method="post" class="panel book-form" novalidate>
+        <div class="alert error-summary" role="alert" th:if="${#fields.hasAnyErrors()}">
+            <h2 th:text="#{form.errors}">Please check the highlighted fields</h2>
+            <ul><li th:each="error : ${#fields.allErrors()}" th:text="${error}"></li></ul>
+        </div>
+        <div class="field">
+            <label for="title" th:text="#{book.title}">Title</label>
+            <input id="title" type="text" th:field="*{title}" th:errorclass="is-invalid" th:placeholder="#{book.title.placeholder}" th:attr="aria-invalid=${#fields.hasErrors('title')}" aria-describedby="title-hint title-error">
+            <small id="title-hint" class="hint" th:text="#{book.title.hint}">Up to 120 characters.</small>
+            <span id="title-error" class="error field-error" th:if="${#fields.hasErrors('title')}" th:errors="*{title}"></span>
+        </div>
+        <div class="field">
+            <label for="author" th:text="#{book.author}">Author</label>
+            <input id="author" type="text" th:field="*{author}" th:errorclass="is-invalid" th:placeholder="#{book.author.placeholder}" th:attr="aria-invalid=${#fields.hasErrors('author')}" aria-describedby="author-error">
+            <span id="author-error" class="error field-error" th:if="${#fields.hasErrors('author')}" th:errors="*{author}"></span>
+        </div>
+        <div class="form-grid">
+            <div class="field">
+                <label for="year" th:text="#{book.year}">Year</label>
+                <input id="year" type="text" inputmode="numeric" th:field="*{year}" th:errorclass="is-invalid" th:attr="aria-invalid=${#fields.hasErrors('year')}" aria-describedby="year-hint year-error">
+                <small id="year-hint" class="hint" th:text="#{book.year.hint}">Between 1450 and 2100.</small>
+                <span id="year-error" class="error field-error" th:if="${#fields.hasErrors('year')}" th:errors="*{year}"></span>
+            </div>
+            <div class="field">
+                <label for="genre" th:text="#{book.genre}">Genre</label>
+                <select id="genre" th:field="*{genre}" th:errorclass="is-invalid" th:attr="aria-invalid=${#fields.hasErrors('genre')}" aria-describedby="genre-error">
+                    <option value="" th:text="#{book.genre.choose}">Choose a genre</option>
+                    <option th:each="genre : ${genres}" th:value="${genre}" th:text="#{${'genre.' + genre.name()}}"></option>
+                </select>
+                <span id="genre-error" class="error field-error" th:if="${#fields.hasErrors('genre')}" th:errors="*{genre}"></span>
+            </div>
+        </div>
+        <div class="field">
+            <label for="isbn"><span th:text="#{book.isbn}">ISBN</span> <span class="optional" th:text="#{form.optional}">optional</span></label>
+            <input id="isbn" type="text" th:field="*{isbn}" th:errorclass="is-invalid" th:placeholder="#{book.isbn.placeholder}" th:attr="aria-invalid=${#fields.hasErrors('isbn')}" aria-describedby="isbn-hint isbn-error">
+            <small id="isbn-hint" class="hint" th:text="#{book.isbn.hint}">Optional ISBN-10 or ISBN-13.</small>
+            <span id="isbn-error" class="error field-error" th:if="${#fields.hasErrors('isbn')}" th:errors="*{isbn}"></span>
+        </div>
+        <label class="checkbox-field" for="available"><input id="available" type="checkbox" th:field="*{available}"><span th:text="#{book.available}">Available</span></label>
+        <div class="form-actions"><button type="submit" th:text="#{form.submit}">Save book</button><a th:href="@{/books}" th:text="#{form.cancel}">Cancel</a></div>
+    </form>
+    <footer><span th:text="#{lab.name}">Laboratory Work 6</span><span th:text="${owner}">Akhmet Didar and Magazhan Nurdaulet, IS-2405</span></footer>
+</main>
+</body>
+</html>

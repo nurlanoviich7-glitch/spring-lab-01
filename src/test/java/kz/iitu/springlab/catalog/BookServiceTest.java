@@ -54,4 +54,13 @@ class BookServiceTest {
         assertThat(service.findAll(null)).hasSize(3);
         assertThat(service.findById(1).orElseThrow().title()).isEqualTo("Effective Java");
     }
+
+    @Test
+    void requiredLookupThrowsAnExceptionWithTheMissingIdentifier() {
+        assertThat(service.requireById(1).title()).isEqualTo("Effective Java");
+        assertThatThrownBy(() -> service.requireById(999))
+                .isInstanceOfSatisfying(BookNotFoundException.class,
+                        exception -> assertThat(exception.getBookId()).isEqualTo(999L));
+        assertThat(service.findById(999)).isEmpty();
+    }
 }
