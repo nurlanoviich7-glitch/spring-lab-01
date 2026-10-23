@@ -1,115 +1,70 @@
-@base = http://localhost:8086
+@base = http://localhost:8080
 
-### Lab 6: empty English form, 200 HTML
-GET {{base}}/books/new?lang=en
-
-### Russian form; the HTTP client retains the session cookie
-GET {{base}}/books/new?lang=ru
-
-### Required title, early year, missing genre, author digits and bad ISBN: 200 with errors, no save
-POST {{base}}/books?lang=en
-Content-Type: application/x-www-form-urlencoded
-
-title=&author=Bloch+2018&year=1200&genre=&available=true&isbn=9780134685992
-
-### The same errors in Russian
-POST {{base}}/books?lang=ru
-Content-Type: application/x-www-form-urlencoded
-
-title=&author=Bloch+2018&year=1200&genre=&available=true&isbn=9780134685992
-
-### Conversion error: rejected year text stays in BindingResult; 200 form with errors
-POST {{base}}/books?lang=en
-Content-Type: application/x-www-form-urlencoded
-
-title=Retained+title&author=Joshua+Bloch&year=not-a-year&genre=PROGRAMMING&isbn=
-
-### Invalid ISBN checksum: 200 form with its own ISBN error
-POST {{base}}/books?lang=en
-Content-Type: application/x-www-form-urlencoded
-
-title=Effective+Java+Companion&author=Joshua+Bloch&year=2018&genre=PROGRAMMING&available=true&isbn=9780134685992
-
-### Correct EAN-13 checksum but not an ISBN prefix: rejected
-POST {{base}}/books?lang=en
-Content-Type: application/x-www-form-urlencoded
-
-title=Effective+Java+Companion&author=Joshua+Bloch&year=2018&genre=PROGRAMMING&isbn=4006381333931
-
-### Valid ISBN-13: 302 to /books, then GET 200 with one flash message
-# Disable automatic redirect following to inspect the initial 302 separately.
-POST {{base}}/books?lang=en
-Content-Type: application/x-www-form-urlencoded
-
-title=Effective+Java+Companion&author=Joshua+Bloch&year=2018&genre=PROGRAMMING&available=true&isbn=9780134685991
-
-### Optional blank ISBN also passes; unchecked availability defaults to false
-POST {{base}}/books?lang=en
-Content-Type: application/x-www-form-urlencoded
-
-title=Java+Precisely&author=Peter+Sestoft&year=2016&genre=PROGRAMMING&isbn=
-
-### GET after redirect or refresh: no additional record is created
-GET {{base}}/books
-
-### Existing detail page: 200 HTML
-GET {{base}}/books/1
-
-### Central page advice: 404 and text/html
-GET {{base}}/books/999?lang=en
-Accept: text/html
-
-### Central API advice: 404 and application/problem+json
-GET {{base}}/api/books/999?lang=en
+### List response DTOs
+GET {{base}}/api/books
 Accept: application/json
 
-### The localized problem uses this URI as instance, without the query string
-GET {{base}}/api/books/999?lang=ru
-Accept: application/json
-
-### Unsupported API response media type is still 406
-GET {{base}}/api/books/999
-Accept: application/xml
-
-### Retained Lab 5 list and author fragment/limit
-GET {{base}}/api/books?author=Bloch&limit=1
-Accept: application/json
-
-### Retained Lab 5 single-book success
+### Read one book
 GET {{base}}/api/books/1
 
-### REST create: 201 plus Location; supplied body ID is ignored
+### Missing resource becomes RFC 9457 problem detail
+GET {{base}}/api/books/999
+
+### Create a book; inspect 201, Location and the response DTO
 POST {{base}}/api/books
 Content-Type: application/json
 
-{"id":1,"title":"Pro Spring 6","author":"Cosmina","year":2023}
+{
+  "title": "REST API Demonstration",
+  "author": "Didar Akhmet",
+  "year": 2026,
+  "genre": "PROGRAMMING"
+}
 
-### Replace the known seeded record: path ID wins, 200
-PUT {{base}}/api/books/2
+> {% client.global.set("bookId", response.body.id); %}
+
+### Follow the identifier from the creation response
+GET {{base}}/api/books/{{bookId}}
+
+### Repeat create to demonstrate 409
+POST {{base}}/api/books
 Content-Type: application/json
 
-{"id":999,"title":"Clean Code Revised","author":"Robert Martin","year":2025}
+{"title":"REST API Demonstration","author":"Didar Akhmet","year":2026,"genre":"PROGRAMMING"}
 
-### Delete the seeded record: 204
-DELETE {{base}}/api/books/2
-
-### Repeated deletion: 404
-DELETE {{base}}/api/books/2
-
-### Retained Lab 5 title search: 200 with matches or an empty array
-GET {{base}}/api/books/search?title=JAVA
-
-### Non-numeric path ID: 400
-GET {{base}}/api/books/abc
-
-### Unknown URL: 404
-GET {{base}}/api/nothing
-
-### Wrong collection method: 405
-DELETE {{base}}/api/books
-
-### Wrong request media type: 415
+### Empty title becomes 400 with errors[].field
 POST {{base}}/api/books
-Content-Type: text/plain
+Content-Type: application/json
 
-This is not JSON.
+{"title":"","author":"Didar Akhmet","year":2026,"genre":"PROGRAMMING"}
+
+### Replace all editable fields; id and createdAt stay unchanged
+PUT {{base}}/api/books/{{bookId}}
+Content-Type: application/json
+
+{"title":"REST API Demonstration Revised","author":"Didar Akhmet","year":2025,"genre":"SCIENCE"}
+
+### Variant 1 first page and its metadata
+GET {{base}}/api/books?page=0&size=2
+
+### Variant 1 next page
+GET {{base}}/api/books?page=1&size=2
+
+### Filter before paging
+GET {{base}}/api/books?author=Bloch&page=0&size=1
+
+### Invalid size becomes 400
+GET {{base}}/api/books?page=0&size=0
+
+### Delete once: 204 with no body
+DELETE {{base}}/api/books/{{bookId}}
+
+### Delete again: 404 problem detail
+DELETE {{base}}/api/books/{{bookId}}
+
+### The Lab 6 page keeps its HTML error view
+GET {{base}}/books/999
+Accept: text/html
+
+### Generated OpenAPI specification
+GET {{base}}/v3/api-docs

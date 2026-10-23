@@ -3,6 +3,7 @@ package kz.iitu.springlab.web;
 import jakarta.validation.Valid;
 import kz.iitu.springlab.catalog.Book;
 import kz.iitu.springlab.catalog.BookService;
+import kz.iitu.springlab.catalog.DuplicateTitleException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
@@ -75,9 +76,18 @@ public class BookPageController {
             model.addAttribute("genres", Genre.values());
             return "books/form";
         }
-        // Lab 5's domain record stores these three fields; the other form fields
-        // demonstrate binding and validation without pretending to persist them.
-        Book saved = service.create(new Book(null, form.getTitle(), form.getAuthor(), form.getYear()));
+        // Genre is now part of the Lab 7 domain. ISBN and availability remain
+        // form validation examples from Lab 6.
+        Book saved;
+        try {
+            saved = service.create(new Book(null, form.getTitle(), form.getAuthor(),
+                    form.getYear(), form.getGenre(), null));
+        } catch (DuplicateTitleException exception) {
+            binding.rejectValue("title", "book.duplicate",
+                    messages.getMessage("book.duplicate", null, locale));
+            model.addAttribute("genres", Genre.values());
+            return "books/form";
+        }
         redirect.addFlashAttribute("message",
                 messages.getMessage("book.added", new Object[]{saved.title()}, locale));
         return "redirect:/books";

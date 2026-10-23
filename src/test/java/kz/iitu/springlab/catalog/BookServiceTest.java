@@ -27,7 +27,11 @@ class BookServiceTest {
     void createTrimsTextAndAllocatesAnIdIndependentOfTheBody() {
         Book saved = service.create(new Book(1L, "  Pro Spring 6  ", "  Cosmina  ", 2023));
 
-        assertThat(saved).isEqualTo(new Book(4L, "Pro Spring 6", "Cosmina", 2023));
+        assertThat(saved.id()).isEqualTo(4L);
+        assertThat(saved.title()).isEqualTo("Pro Spring 6");
+        assertThat(saved.author()).isEqualTo("Cosmina");
+        assertThat(saved.year()).isEqualTo(2023);
+        assertThat(saved.createdAt()).isNotNull();
         assertThat(service.findById(1).orElseThrow().title()).isEqualTo("Effective Java");
     }
 

@@ -150,6 +150,33 @@ class BookFormWebIntegrationTest {
     }
 
     @Test
+    void duplicateFormSubmissionRedisplaysLocalizedTitleErrorWithoutCreatingABook() throws Exception {
+        for (String language : new String[]{"en", "ru"}) {
+            Locale locale = Locale.forLanguageTag(language);
+            String expected = messages.getMessage("book.duplicate", null, locale);
+            var result = mvc.perform(post("/books")
+                            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                            .param("lang", language)
+                            .param("title", "  EFFECTIVE JAVA  ")
+                            .param("author", "  joshua bloch  ")
+                            .param("year", "2018").param("genre", "PROGRAMMING"))
+                    .andExpect(status().isOk()).andExpect(view().name("books/form"))
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                    .andExpect(model().attributeHasFieldErrors("form", "title"))
+                    .andExpect(model().attributeExists("genres"))
+                    .andExpect(content().string(containsString(expected)))
+                    .andReturn();
+            assertThat(binding(result).getFieldError("title").getDefaultMessage()).isEqualTo(expected);
+            assertThat(((BookForm) result.getModelAndView().getModel().get("form")).getTitle())
+                    .isEqualTo("  EFFECTIVE JAVA  ");
+            assertThat((Genre[]) result.getModelAndView().getModel().get("genres"))
+                    .containsExactly(Genre.values());
+            assertThat(service.findAll(null)).hasSize(3);
+            assertThat(service.requireById(1).title()).isEqualTo("Effective Java");
+        }
+    }
+
+    @Test
     void sameMissingBookBecomesHtmlForPagesAndProblemJsonForApi() throws Exception {
         mvc.perform(get("/books/1"))
                 .andExpect(status().isOk()).andExpect(view().name("books/detail"))

@@ -5,6 +5,8 @@ import org.springframework.stereotype.Repository;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Locale;
+import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -29,20 +31,42 @@ public class BookRepository {
         return Optional.ofNullable(storage.get(id));
     }
 
-    public Book create(Book book) {
+    public synchronized Book create(Book book) {
+        rejectDuplicate(book, null);
         long id = sequence.incrementAndGet();
-        Book stored = new Book(id, book.title(), book.author(), book.year());
+        Book stored = new Book(id, book.title(), book.author(), book.year(),
+                book.genre(), Instant.now());
         storage.put(id, stored);
         return stored;
     }
 
-    public Optional<Book> replace(long id, Book book) {
-        // An atomic existing-only replacement cannot recreate a deleted record.
-        return Optional.ofNullable(storage.computeIfPresent(id,
-                (key, previous) -> new Book(key, book.title(), book.author(), book.year())));
+    public synchronized Optional<Book> replace(long id, Book book) {
+        Book previous = storage.get(id);
+        if (previous == null) {
+            return Optional.empty();
+        }
+        rejectDuplicate(book, id);
+        Book stored = new Book(id, book.title(), book.author(), book.year(),
+                book.genre(), previous.createdAt());
+        storage.put(id, stored);
+        return Optional.of(stored);
     }
 
-    public boolean deleteById(long id) {
+    public synchronized boolean deleteById(long id) {
         return storage.remove(id) != null;
+    }
+
+    private void rejectDuplicate(Book candidate, Long excludedId) {
+        boolean duplicate = storage.values().stream()
+                .filter(book -> !book.id().equals(excludedId))
+                .anyMatch(book -> key(book.title()).equals(key(candidate.title()))
+                        && key(book.author()).equals(key(candidate.author())));
+        if (duplicate) {
+            throw new DuplicateTitleException(candidate.title());
+        }
+    }
+
+    private String key(String value) {
+        return value.strip().toLowerCase(Locale.ROOT);
     }
 }

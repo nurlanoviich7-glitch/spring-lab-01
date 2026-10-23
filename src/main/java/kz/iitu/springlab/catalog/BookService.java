@@ -54,6 +54,16 @@ public class BookService {
         return repository.deleteById(id);
     }
 
+    public Book update(long id, Book book) {
+        return replace(id, book).orElseThrow(() -> new BookNotFoundException(id));
+    }
+
+    public void deleteRequired(long id) {
+        if (!delete(id)) {
+            throw new BookNotFoundException(id);
+        }
+    }
+
     private Book validated(Book book) {
         if (book == null || book.title() == null || book.title().isBlank()) {
             throw new IllegalArgumentException("Title must not be blank");
@@ -64,6 +74,10 @@ public class BookService {
         if (book.year() < 1 || book.year() > 9999) {
             throw new IllegalArgumentException("Year must be between 1 and 9999");
         }
-        return new Book(book.id(), book.title().strip(), book.author().strip(), book.year());
+        if (book.genre() == null) {
+            throw new IllegalArgumentException("Genre must be selected");
+        }
+        return new Book(book.id(), book.title().strip(), book.author().strip(), book.year(),
+                book.genre(), book.createdAt());
     }
 }

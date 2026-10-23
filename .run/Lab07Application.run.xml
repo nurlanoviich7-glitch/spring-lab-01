@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Lab06Application" type="Application" factoryName="Application">
+  <configuration default="false" name="Lab07Application" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="kz.iitu.springlab.SpringLab01Application" />
     <module name="spring-lab-01.main" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />

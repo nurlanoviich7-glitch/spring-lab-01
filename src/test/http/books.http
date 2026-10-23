@@ -1,0 +1,70 @@
+@base = http://localhost:8080
+
+### List response DTOs
+GET {{base}}/api/books
+Accept: application/json
+
+### Read one book
+GET {{base}}/api/books/1
+
+### Missing resource becomes RFC 9457 problem detail
+GET {{base}}/api/books/999
+
+### Create a book; inspect 201, Location and the response DTO
+POST {{base}}/api/books
+Content-Type: application/json
+
+{
+  "title": "REST API Demonstration",
+  "author": "Didar Akhmet",
+  "year": 2026,
+  "genre": "PROGRAMMING"
+}
+
+> {% client.global.set("bookId", response.body.id); %}
+
+### Follow the identifier from the creation response
+GET {{base}}/api/books/{{bookId}}
+
+### Repeat create to demonstrate 409
+POST {{base}}/api/books
+Content-Type: application/json
+
+{"title":"REST API Demonstration","author":"Didar Akhmet","year":2026,"genre":"PROGRAMMING"}
+
+### Empty title becomes 400 with errors[].field
+POST {{base}}/api/books
+Content-Type: application/json
+
+{"title":"","author":"Didar Akhmet","year":2026,"genre":"PROGRAMMING"}
+
+### Replace all editable fields; id and createdAt stay unchanged
+PUT {{base}}/api/books/{{bookId}}
+Content-Type: application/json
+
+{"title":"REST API Demonstration Revised","author":"Didar Akhmet","year":2025,"genre":"SCIENCE"}
+
+### Variant 1 first page and its metadata
+GET {{base}}/api/books?page=0&size=2
+
+### Variant 1 next page
+GET {{base}}/api/books?page=1&size=2
+
+### Filter before paging
+GET {{base}}/api/books?author=Bloch&page=0&size=1
+
+### Invalid size becomes 400
+GET {{base}}/api/books?page=0&size=0
+
+### Delete once: 204 with no body
+DELETE {{base}}/api/books/{{bookId}}
+
+### Delete again: 404 problem detail
+DELETE {{base}}/api/books/{{bookId}}
+
+### The Lab 6 page keeps its HTML error view
+GET {{base}}/books/999
+Accept: text/html
+
+### Generated OpenAPI specification
+GET {{base}}/v3/api-docs
