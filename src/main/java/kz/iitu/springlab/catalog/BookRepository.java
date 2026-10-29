@@ -1,72 +1,45 @@
 package kz.iitu.springlab.catalog;
+import kz.iitu.springlab.web.Genre;
+import org.springframework.data.domain.*;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
+import java.util.*;
 
-import org.springframework.stereotype.Repository;
-
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-import java.util.Locale;
-import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-
-@Repository
-public class BookRepository {
-    private final ConcurrentHashMap<Long, Book> storage = new ConcurrentHashMap<>();
-    private final AtomicLong sequence = new AtomicLong();
-
-    public BookRepository() {
-        create(new Book(null, "Effective Java", "Joshua Bloch", 2018));
-        create(new Book(null, "Clean Code", "Robert Martin", 2008));
-        create(new Book(null, "Spring in Action", "Craig Walls", 2022));
-    }
-
-    public List<Book> findAll() {
-        return storage.values().stream()
-                .sorted(Comparator.comparing(Book::id))
-                .toList();
-    }
-
-    public Optional<Book> findById(long id) {
-        return Optional.ofNullable(storage.get(id));
-    }
-
-    public synchronized Book create(Book book) {
-        rejectDuplicate(book, null);
-        long id = sequence.incrementAndGet();
-        Book stored = new Book(id, book.title(), book.author(), book.year(),
-                book.genre(), Instant.now());
-        storage.put(id, stored);
-        return stored;
-    }
-
-    public synchronized Optional<Book> replace(long id, Book book) {
-        Book previous = storage.get(id);
-        if (previous == null) {
-            return Optional.empty();
-        }
-        rejectDuplicate(book, id);
-        Book stored = new Book(id, book.title(), book.author(), book.year(),
-                book.genre(), previous.createdAt());
-        storage.put(id, stored);
-        return Optional.of(stored);
-    }
-
-    public synchronized boolean deleteById(long id) {
-        return storage.remove(id) != null;
-    }
-
-    private void rejectDuplicate(Book candidate, Long excludedId) {
-        boolean duplicate = storage.values().stream()
-                .filter(book -> !book.id().equals(excludedId))
-                .anyMatch(book -> key(book.title()).equals(key(candidate.title()))
-                        && key(book.author()).equals(key(candidate.author())));
-        if (duplicate) {
-            throw new DuplicateTitleException(candidate.title());
-        }
-    }
-
-    private String key(String value) {
-        return value.strip().toLowerCase(Locale.ROOT);
-    }
+public interface BookRepository extends JpaRepository<Book,Long> {
+    List<Book> findByGenre(Genre genre);
+    List<Book> findByTitleContainingIgnoreCase(String fragment);
+    List<Book> findByYearBetweenOrderByYearDesc(int from,int to);
+    List<Book> findTop3ByGenreOrderByYearDesc(Genre genre);
+    long countByAuthorName(String name);
+    @Query("select b from Book b where b.genre=:genre and b.year>=:year order by b.title")
+    List<Book> search(@Param("genre") Genre genre,@Param("year") int year);
+    @Modifying(clearAutomatically=true,flushAutomatically=true)
+    @Query("update Book b set b.archived=true, b.version=b.version+1 where b.year<:year and b.archived=false")
+    int archiveOlderThan(@Param("year") int year);
+    @Query("select b from Book b join fetch b.author") List<Book> findAllWithAuthor();
+    @EntityGraph(attributePaths={"author","publisher"})
+    Page<Book> findByGenre(Genre genre,Pageable pageable);
+    // Variant 1 traverses Book.publisher.name and derives its join.
+    @EntityGraph(attributePaths={"author","publisher"})
+    List<Book> findByPublisherNameIgnoreCase(String name);
+    @EntityGraph(attributePaths={"author","publisher"}) List<Book> findAllByOrderByIdAsc();
+    @Override @EntityGraph(attributePaths={"author","publisher"}) Optional<Book> findById(Long id);
+    @EntityGraph(attributePaths={"author","publisher"}) Page<Book> findAllBy(Pageable pageable);
+    @EntityGraph(attributePaths={"author","publisher"}) Slice<Book> findSliceBy(Pageable pageable);
+    @EntityGraph(attributePaths={"author","publisher"})
+    @Query(value="""
+            select b from Book b
+            where (:genre is null or b.genre=:genre)
+              and (:author is null or locate(lower(cast(:author as string)),lower(b.author.name))>0)
+              and (:publisher is null or lower(b.publisher.name)=lower(cast(:publisher as string)))
+            """,countQuery="""
+            select count(b) from Book b
+            where (:genre is null or b.genre=:genre)
+              and (:author is null or locate(lower(cast(:author as string)),lower(b.author.name))>0)
+              and (:publisher is null or lower(b.publisher.name)=lower(cast(:publisher as string)))
+            """)
+    Page<Book> findFiltered(@Param("genre") Genre genre,@Param("author") String author,
+                            @Param("publisher") String publisher,Pageable pageable);
+    boolean existsByTitleKeyAndAuthorNameKey(String titleKey,String authorKey);
+    boolean existsByTitleKeyAndAuthorNameKeyAndIdNot(String titleKey,String authorKey,long id);
 }

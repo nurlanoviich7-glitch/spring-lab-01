@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 8 PostgreSQL Catalogue</title><link rel="stylesheet" href="/css/app.css">
+<style>
+.lab8{max-width:1200px;margin:0 auto;padding:48px 24px 64px}.lab8 h1{font-size:40px;margin:0 0 14px}.lab8 h2{font-size:24px;margin:40px 0 14px}
+.lab8 .lede{max-width:780px;color:#546369;font-size:18px;line-height:1.65}.lab8 table{width:100%;border-collapse:collapse;font-size:14px}
+.lab8 th,.lab8 td{padding:14px 12px;border-bottom:1px solid #d9e2df;text-align:left}.lab8 th{background:#e9f1ed}.lab8 .table-scroll{margin-top:24px;background:white;border:1px solid #d9e2df;border-radius:8px}
+.lab8 .summary{font-size:18px;line-height:1.8;margin:18px 0}.lab8 .actions{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}
+.lab8 .actions button{font-size:15px;padding:11px 17px}.lab8 pre{background:#17222d;color:#e9f1f5;padding:24px;line-height:1.65;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.7 Consolas,monospace}
+.lab8 .server{font-size:14px;color:#52665c;line-height:1.8}.lab8 .inline-form{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:20px 0}.lab8 .inline-form input{width:230px}.lab8 .note{line-height:1.8;color:#52665c;max-width:900px}.lab8 output{display:block}
+</style></head>
+<body><header class="topbar"><a class="brand" href="/lab8">Open Shelf</a><nav aria-label="Main navigation">
+<a href="/books">Catalogue</a><a href="/books/new">Add a book</a><a class="active" href="/lab8">PostgreSQL lab</a><a href="/swagger-ui.html">Swagger</a></nav></header>
+<main class="lab8"><h1>PostgreSQL catalogue</h1>
+<p class="lede">Laboratory Work 8 connects the book catalogue to PostgreSQL. Author and publisher foreign keys belong to each book. The book_tag table stores shared tag relationships.</p>
+<p class="summary"><strong th:text="${counts.books}">8</strong> books &nbsp; <strong th:text="${counts.authors}">3</strong> authors &nbsp; <strong th:text="${counts.tags}">4</strong> tags &nbsp; <strong th:text="${counts.publishers}">2</strong> publishers</p>
+<p class="server"><strong>Database:</strong> <span th:text="${server.database}">springlab</span> &nbsp; <strong>User:</strong> <span th:text="${server.username}">springlab</span><br><span th:text="${server.version}">PostgreSQL</span></p>
+<div class="table-scroll"><table><thead><tr><th>ID</th><th>Book title</th><th>Author</th><th>Year</th><th>Publisher</th><th>Author FK</th><th>Publisher FK</th></tr></thead>
+<tbody><tr th:each="b:${books}"><td th:text="${b.id}"></td><td><a th:href="@{/books/{id}(id=${b.id})}" th:text="${b.title}"></a></td><td th:text="${b.author}"></td><td th:text="${b.publication_year}"></td><td th:text="${b.publisher}"></td><td th:text="${b.author_id}"></td><td th:text="${b.publisher_id}"></td></tr></tbody></table></div>
+<h2>Repository experiments</h2><p class="note">Each experiment records the SQL that Hibernate actually prepares. The N+1 comparison clears the persistence context before each run. Page and Slice use the same page number and size.</p>
+<div class="actions"><button type="button" data-url="/api/lab8/queries">Derived and JPQL queries</button><button type="button" data-url="/api/lab8/n-plus-one">N+1 comparison</button><button type="button" data-url="/api/lab8/page-vs-slice">Page and Slice</button><button type="button" data-url="/api/lab8/database">Database schema</button></div>
+<h2>Variant 1 Publisher</h2><form id="publisher-form" class="inline-form"><div class="field"><label for="publisher">Publisher name</label><input id="publisher" name="publisher" value="Manning" required maxlength="120"></div><button type="submit">Find publisher books</button></form>
+<h2>Measured result</h2><output id="status" aria-live="polite">Select an experiment to see its result.</output><pre id="result">The database table above is live PostgreSQL data.</pre>
+<h2>Collection pages</h2><p class="note">The API always returns a page. Its default size is 5 and its default sort is title. Invalid sort properties return a 400 problem response.</p>
+<p><a href="/api/books?page=1&amp;size=3&amp;sort=year,desc">Second page sorted by year</a> &nbsp; <a href="/api/books?publisher=Manning">Manning books</a></p>
+<footer><span>Laboratory Work 8</span><span>Akhmet Didar and Magazhan Nurdaulet, IS-2405</span></footer></main>
+<script>
+async function show(url){const status=document.getElementById('status');status.textContent='Running '+url;try{const response=await fetch(url,{headers:{Accept:'application/json'}});const value=await response.json();document.getElementById('result').textContent=JSON.stringify(value,null,2);status.textContent='HTTP '+response.status+' '+url;}catch(error){status.textContent='Request failed. Check that the application and database are running.';}}
+document.querySelectorAll('[data-url]').forEach(button=>button.addEventListener('click',()=>show(button.dataset.url)));
+document.getElementById('publisher-form').addEventListener('submit',event=>{event.preventDefault();show('/api/lab8/publishers?name='+encodeURIComponent(document.getElementById('publisher').value));});
+</script></body></html>

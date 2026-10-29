@@ -33,3 +33,6 @@ bin/
 .gradle/
 /build/
 *.log
+
+### Local PostgreSQL runtime ###
+.lab8-runtime/

@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+@org.springframework.test.context.ActiveProfiles("test")
 @SpringBootTest
 class OpenApiIntegrationTest {
     @Autowired
@@ -52,7 +53,7 @@ class OpenApiIntegrationTest {
                 .andExpect(jsonPath("$.components.schemas.BookRequest.properties.createdAt").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.BookRequest.required", hasItems("title", "author", "genre")))
                 .andExpect(jsonPath("$.components.schemas.BookResponse.properties.createdAt").exists())
-                .andExpect(jsonPath("$.components.schemas.BookPageResponse.properties.totalElements").exists())
+                .andExpect(jsonPath("$.paths['/api/books'].get.responses['200']").exists())
                 .andExpect(jsonPath("$.paths['/api/books'].get.parameters[*].name", hasItems("page", "size", "author")));
     }
 

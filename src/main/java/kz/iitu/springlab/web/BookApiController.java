@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import kz.iitu.springlab.web.Genre;
 import kz.iitu.springlab.catalog.Book;
 import kz.iitu.springlab.catalog.BookService;
 import kz.iitu.springlab.web.dto.BookMapper;
@@ -43,38 +44,32 @@ public class BookApiController {
         this.mapper = mapper;
     }
 
-    @Operation(summary = "List books or request a page",
-            description = "Without page and size, returns an array. Supply either parameter for a page envelope. "
-                    + "Pages start at zero; default page is 0, default size is 10, maximum size is 100. "
-                    + "Author filtering happens before paging; results are ordered by identifier.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Books or a page of books",
-                    content = @Content(schema = @Schema(oneOf = {BookResponse[].class, BookPageResponse.class}))),
-            @ApiResponse(responseCode = "400", description = "Invalid page or size",
-                    content = @Content(mediaType = "application/problem+json",
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    })
+    @Operation(summary = "List a database page of books",
+            description = "Always paged. Default size 5, title ascending, then id. "
+                    + "Optional genre, author and publisher filters run in PostgreSQL. "
+                    + "Page numbers start at zero and size must be 1 through 100.")
+    @ApiResponses({@ApiResponse(responseCode="200", description="Page with content and total count"),
+        @ApiResponse(responseCode="400", description="Invalid paging, genre or sort")})
     @GetMapping
-    public Object list(@RequestParam(name = "author", required = false) String author,
-                       @Parameter(description = "Zero-based page number", example = "0")
-                       @RequestParam(name = "page", required = false) Integer page,
-                       @Parameter(description = "Books per page, between 1 and 100", example = "2")
-                       @RequestParam(name = "size", required = false) Integer size) {
-        List<Book> books = service.findAll(author);
-        if (page == null && size == null) {
-            return mapper.toResponseList(books);
+    public org.springframework.data.domain.Page<BookResponse> list(
+            @RequestParam(name="genre",required=false) Genre genre,
+            @RequestParam(name="author",required=false) String author,
+            @RequestParam(name="publisher",required=false) String publisher,
+            @org.springdoc.core.annotations.ParameterObject
+            @org.springframework.data.web.PageableDefault(size=5,sort="title") org.springframework.data.domain.Pageable pageable,
+            @RequestParam java.util.Map<String,String> parameters) {
+        validateNumber(parameters,"page",0,Integer.MAX_VALUE);
+        validateNumber(parameters,"size",1,100);
+        return service.find(genre,author,publisher,pageable).map(mapper::toResponse);
+    }
+    private void validateNumber(java.util.Map<String,String> parameters,String field,int min,int max) {
+        if(!parameters.containsKey(field))return;
+        try {
+            int value=Integer.parseInt(parameters.get(field));
+            if(value<min||value>max)throw new IllegalArgumentException(field+" must be between "+min+" and "+max);
+        } catch(NumberFormatException exception) {
+            throw new IllegalArgumentException(field+" must be an integer");
         }
-        int requestedPage = page == null ? 0 : page;
-        int requestedSize = size == null ? 10 : size;
-        if (requestedPage < 0 || requestedSize < 1 || requestedSize > 100) {
-            throw new IllegalArgumentException("Page must be zero or greater; size must be between 1 and 100");
-        }
-        long total = books.size();
-        long offset = (long) requestedPage * requestedSize;
-        List<Book> selected = offset >= total ? List.of()
-                : books.subList((int) offset, (int) Math.min(total, offset + requestedSize));
-        return new BookPageResponse(mapper.toResponseList(selected), requestedPage, requestedSize,
-                total, (total + requestedSize - 1) / requestedSize);
     }
 
     @Operation(summary = "Find a book by its identifier")

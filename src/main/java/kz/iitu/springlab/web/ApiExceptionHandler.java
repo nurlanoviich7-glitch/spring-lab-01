@@ -88,5 +88,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return super.createResponseEntity(body, headers, status, request);
     }
 
+    @ExceptionHandler({org.springframework.dao.DataIntegrityViolationException.class,
+            org.springframework.orm.ObjectOptimisticLockingFailureException.class})
+    public ProblemDetail databaseConflict(RuntimeException exception) {
+        ProblemDetail problem=ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "The update conflicts with an existing record or a concurrent change");
+        problem.setType(URI.create("https://api.iitu.kz/errors/database-conflict"));
+        problem.setTitle("Database conflict");
+        return problem;
+    }
+
     public record FieldViolation(String field, String message) { }
 }
