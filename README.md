@@ -1,69 +1,72 @@
-# Laboratory Work 8 PostgreSQL and Spring Data JPA
+# Laboratory Work 9: Spring Transactions and Flyway
 
 **Akhmet Didar and Magazhan Nurdaulet, IS-2405**
 
-Variant 1 adds a Publisher entity and a derived query by publisher name. This branch extends the completed Lab 7 source state, commit `19e21d4`. The catalogue now stores books in PostgreSQL. The earlier HTML forms, validation and REST CRUD remain available. Collection GET now always returns a database page.
+This standalone laboratory application implements atomic account transfers, rollback rules, propagation, isolation and optimistic locking on PostgreSQL. Flyway manages the schema and Hibernate only validates it. The lab09 branch follows the completed Lab 8 history; its current source tree is the separate Lab 9 application. The lab08 branch and its book catalogue remain unchanged.
 
-## Start in IntelliJ IDEA
+## Run in IntelliJ IDEA
 
-1. Open this folder as a Gradle project and use Java 25.
-2. Start PostgreSQL before starting Java. On the prepared workstation, run `Start-Database.ps1` from the project folder. The portable cluster is an ignored local directory and listens on `127.0.0.1:5438`.
-3. Run the shared **Lab08Application** configuration.
-4. Open <http://127.0.0.1:8088/lab8>, <http://127.0.0.1:8088/books/new> or <http://127.0.0.1:8088/swagger-ui.html>.
+1. Open this folder or its `pom.xml` as a Maven project. Use Java 21 or newer. The prepared workstation uses the installed Java 25 SDK.
+2. On the prepared workstation run `Start-Database.ps1`. It reuses the existing portable PostgreSQL server on loopback port 5438 and creates separate `txlab9`, `txlab9_test` and `txlab9_verify` databases if missing. It does not change the Lab 8 database.
+3. Run the shared **Lab09Application** configuration.
+4. Open <http://127.0.0.1:8089/lab9>.
 
-The project ZIP contains source and the Gradle wrapper. PostgreSQL binaries and database data are external runtime prerequisites and are excluded from Git and the ZIP. On another workstation, use PostgreSQL 16 or newer, or start the included `compose.yml` with `docker compose up -d`. Create `springlab`, `springlab_test` and `springlab_verify` for the checks. The development defaults are the classroom credentials `springlab` / `springlab`, restricted to loopback.
+The source ZIP excludes PostgreSQL binaries, database data, IDE caches and build outputs. On another workstation use an installed PostgreSQL 16+ server, or run `docker compose up -d`. The compose server uses loopback port **5439** to avoid the prepared Lab 8 server. For Docker set `DB_URL=jdbc:postgresql://127.0.0.1:5439/txlab9` and `TEST_DB_URL=jdbc:postgresql://127.0.0.1:5439/txlab9_test`. The classroom username/password are `springlab` / `springlab`.
 
-## Configuration
+## Build and configuration
 
-| Setting | Default | Override |
+Windows: `mvnw.cmd clean verify`. macOS/Linux: `./mvnw clean verify`. Maven downloads its official distribution and the declared dependencies when necessary. Java 21 is the compilation target. Spring Boot 3.5.16 is used to satisfy the assignment's Spring Boot 3.x requirement. Tests require the separate PostgreSQL database, not H2.
+
+| Setting | Default | Environment override |
 | --- | --- | --- |
-| HTTP port | 8088 | `PORT` |
-| JDBC URL | `jdbc:postgresql://127.0.0.1:5438/springlab` | `DB_URL` |
-| Database user | springlab | `DB_USER` |
-| Database password | springlab | `DB_PASSWORD` |
-| Test database | `jdbc:postgresql://127.0.0.1:5438/springlab_test` | `TEST_DB_URL` |
+| HTTP | 127.0.0.1:8089 | PORT |
+| JDBC | jdbc:postgresql://127.0.0.1:5438/txlab9 | DB_URL |
+| User / password | springlab / springlab | DB_USER / DB_PASSWORD |
+| Test JDBC | jdbc:postgresql://127.0.0.1:5438/txlab9_test | TEST_DB_URL |
 
-The default `dev` profile uses `ddl-auto=update`, so restarting Java preserves the demonstration records. An explicit `classroom` profile uses `create-drop` for the assignment experiment and destroys its selected schema. The `test` profile uses create-drop only in the separate test database. The `prod` profile uses validate and expects a separately managed schema. `open-in-view=false` applies throughout.
+The test reset checks that the current database name ends in `_test` before modifying test rows. Hibernate uses `ddl-auto=validate` and `open-in-view=false`. Flyway clean is disabled. The staged migration test uses a generated schema only inside the test database.
 
-## Data model
+## Experiments
 
-`book.author_id` owns the Author association. `Author.books` is inverse, with `mappedBy="author"`, cascade ALL and orphan removal. `Book.tags` owns the `book_tag(book_id, tag_id)` join table. Tags are shared and do not cascade REMOVE. For variant 1, `book.publisher_id` owns the Publisher association and `Publisher.books` is inverse. Book uses an identity identifier, EnumType.STRING, a server creation timestamp and an optimistic version.
+Each experiment creates its own pair with balances 1000.00 / 500.00. The experiment endpoints leave Alice and Bob unchanged. The transfer form intentionally changes Alice and Bob. All data is classroom sample data.
 
-The development runner inserts eight books, three authors, four tags and two publishers only when the book table is empty. At least one author has three books and at least one book has two tags. This is a demonstration dataset, including the sample title API Design Notes.
-
-## Routes for the demonstration
-
-| Route | Result |
+| POST /api/experiments/{name} | Expected database observation |
 | --- | --- |
-| `/lab8` | Live PostgreSQL rows and experiment controls |
-| `/api/books?page=1&size=3&sort=year,desc` | Database page with total count |
-| `/api/books?genre=PROGRAMMING&publisher=Manning` | Database filtering and paging |
-| `/api/lab8/queries` | Five derived queries, JPQL results and captured SQL |
-| `/api/lab8/n-plus-one` | Fresh-context SQL counts before and after fetch join |
-| `/api/lab8/page-vs-slice` | Page and Slice SQL for the same full middle page |
-| `/api/lab8/database` | Actual columns, foreign keys and rows |
-| `/api/lab8/publishers?name=Manning` | Variant 1 derived query and SQL |
-| `/api/lab8/books/1` | Author, publisher, tags, archived flag and version |
-| `POST /api/lab8/archive?year=2010` | Transactional bulk update |
+| success | 900.00 / 600.00, both versions increment |
+| insufficient | 1000.00 / 500.00, no changes |
+| unchecked | Flushed debit rolls back, 1000.00 / 500.00 |
+| checked-default | Default checked-exception rule commits debit, 900.00 / 500.00 |
+| checked-rollback | rollbackFor restores 1000.00 / 500.00 |
+| required | Outer debit and audit roll back; audit count 0; same transaction id |
+| requires-new | Outer debit rolls back; audit count 1; different transaction ids |
+| read-committed | First read 1000.00, second 1100.00 after independent writer commits |
+| repeatable-read | First and second reads 1000.00; committed balance outside is 1100.00 |
+| optimistic-lock | First version 0 -> 1 commits; stale version 0 is rejected; balance 1100.00 |
 
-Page numbers start at zero. Default size is 5 and the maximum is 100. A stable id tie-breaker follows the requested sort. Invalid sort names, sizes and page values return 400 problem JSON. POST returns 201 and Location, PUT retains id and createdAt, and DELETE returns 204 followed by 404 on repeat.
+Isolation uses two real PostgreSQL transactions on different connections. JDBC SELECT is intentional: repeatedly loading the same managed JPA entity could show the first-level cache rather than the database isolation behavior. REQUIRES_NEW auditing is on a separate bean, so its proxy is invoked. The audit table has no foreign key to the uncommitted outer update and therefore avoids a cross-transaction dependency on that row.
 
-## Verification
+## Public API
 
-Run `gradlew.bat test bootJar` against the separate PostgreSQL test database. The recorded build passed **62 tests with no failures, errors or skipped tests**. A separate packaged-application check passed **33 HTTP responses and 94 assertions**, including application restart persistence.
+- `GET /api/accounts`: the Alice and Bob sample accounts.
+- `GET /api/accounts/{id}`: account, balance, status and version.
+- `POST /api/transfers`: JSON `{"fromId":1,"toId":2,"amount":100.00}`.
+- `PUT /api/accounts/{id}/balance`: classroom update with `{"balance":1100.00,"expectedVersion":0}`. A stale version returns 409 and does not overwrite current data.
+- `POST /api/experiments/{name}`: structured observations, including before and after balances read back from PostgreSQL.
+- `GET /api/migrations`: real Flyway history, checksums and the owner-name index.
 
-With the original eight-book seed, lazy loading author names requires four statements: one book query and three distinct author queries. The fetch join requires one. A full middle Page of three books requires a content query and count query. Slice requests one extra row and requires one query. Spring can omit a Page count for a short final page, so two is the measured result for this particular request, not a universal rule.
+Invalid input returns 400, missing accounts 404, and insufficient funds or optimistic conflicts 409 with problem JSON. The code uses BigDecimal and decimal(19,2), rejects excess fractional precision and does not use floating-point balance arithmetic.
 
-The bulk update increments version explicitly because JPQL bulk operations bypass ordinary entity dirty checking. It clears the persistence context to prevent stale managed values. Named parameters use explicit string casts in optional text filters so PostgreSQL can type null values. Entity graphs fetch only to-one associations for paged queries, avoiding collection-fetch pagination in memory.
+## Schema versioning
 
-## Repository and references
+V1 creates accounts and inserts Alice/Bob. V2 adds ACTIVE status. V3 creates independent audit records. V4 adds the owner-name index. Migrations are immutable after application. The lifecycle test starts an empty generated schema, applies only V1/V2, restarts with zero new migrations and unchanged history, applies V3/V4, then confirms that a modified temporary copy of V1 fails checksum validation. Original migration files are not changed by that test.
 
-Branch: `lab08`. Repository: <https://github.com/nurlanoviich7-glitch/spring-lab-01>. Publication of a branch must be verified separately from a local commit.
+The demonstration database is independent of tests and packaged HTTP verification. See the report and `Defence_LAB09_EN.md` for observations, a demonstration script and answers.
 
-See `Defence_LAB08_EN.md` for the English oral explanation and answers to all demonstration questions. SQL and runtime evidence accompany the report.
+Repository: <https://github.com/nurlanoviich7-glitch/spring-lab-01>. Branch: lab09. Remote publication is verified separately from a local commit.
 
-Primary documentation:
-- <https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html>
-- <https://docs.spring.io/spring-boot/reference/data/sql.html>
-- <https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html>
-- <https://www.postgresql.org/docs/16/>
+Primary references:
+- <https://docs.spring.io/spring-boot/3.5/system-requirements.html>
+- <https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/rolling-back.html>
+- <https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html>
+- <https://www.postgresql.org/docs/16/transaction-iso.html>
+- <https://documentation.red-gate.com/flyway/flyway-concepts/migrations/versioned-migrations>

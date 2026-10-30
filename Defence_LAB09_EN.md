@@ -1,0 +1,46 @@
+# Laboratory Work 9 Defence Guide
+
+Akhmet Didar and Magazhan Nurdaulet, IS-2405
+
+## Ready to say during the defence
+
+Good afternoon. Our ninth laboratory work demonstrates Spring transaction management and database schema versioning. We used Spring Boot 3, Spring Data JPA, PostgreSQL 16 and Flyway. The model contains accounts with an owner name, a decimal balance, a status and a version. Flyway creates and changes the schema. Hibernate uses validate, so it checks the mappings instead of creating tables itself.
+
+The normal transfer method is a service transaction. It loads the source and destination, debits one account and credits the other. These changes share one transaction. In the successful experiment, the balances change from one thousand and five hundred to nine hundred and six hundred. The total stays fifteen hundred. We use BigDecimal so the money calculation does not depend on binary floating-point rounding.
+
+We tested two failure paths. An amount larger than the available balance fails without changing either account. We also flush the debit and deliberately throw an unchecked exception before the credit. The database still returns the original balances afterwards, which proves that flush did not commit the debit. An ordinary checked exception behaves differently under Spring's default rule: the debit commits. Adding rollbackFor for that checked exception restores atomic rollback. These failure methods are classroom experiments with separate sample accounts.
+
+The propagation experiment calls an audit service through another Spring bean. REQUIRED joins the outer transaction. When the outer method fails, the audit disappears together with the debit. REQUIRES_NEW suspends the outer transaction and commits the audit in an independent transaction. The outer debit then rolls back, but one audit row remains. PostgreSQL transaction identifiers confirm whether the calls shared a transaction. We avoid self-invocation because a direct call within one object would bypass the transactional proxy.
+
+For isolation, one reader transaction remains open while another transaction updates and commits the same account. On PostgreSQL READ_COMMITTED, the first read is one thousand and the second is eleven hundred. On REPEATABLE_READ, both reads inside the reader return one thousand, although a new transaction sees eleven hundred. We use repeated JDBC SELECT statements to avoid confusing the JPA first-level cache with a database snapshot. PostgreSQL also prevents phantom reads at repeatable read, which is stronger than the minimum SQL standard requirement. Serialization anomalies can still remain at that level.
+
+For optimistic locking, two independent persistence contexts load version zero of the same account. The first adds one hundred and commits version one. The stale copy tries to add fifty using version zero, so its update is rejected. The final balance is eleven hundred, not ten hundred and fifty. The normal update API also requires the expected version and returns HTTP 409 for stale input. The safe response is to reload and explain the conflict. Blindly retrying a transfer could repeat a business operation.
+
+Our migrations have four versions. V1 creates accounts and inserts Alice and Bob. V2 adds ACTIVE status, V3 adds the audit table and V4 creates an index on the owner name. In a fresh test schema, we first apply only V1 and V2. A second start applies zero migrations and leaves the history unchanged. We then apply V3 and V4 and inspect the index. A changed temporary copy of V1 fails checksum validation, so the original applied migration must remain immutable. New changes belong in new migration files.
+
+The dashboard displays live PostgreSQL balances, migration history and experiment results. Each experiment creates a separate pair, so demonstrating rollback or locking does not change Alice and Bob. The transfer form changes those two sample accounts. The tests and packaged application checks use separate databases as well. The main lesson is that transaction boundaries, propagation, isolation and version checks solve different problems, and each behavior must be verified against the actual database. Thank you for your attention.
+
+## Demonstration sequence
+
+1. Run Lab09Application in IntelliJ. Point to PostgreSQL, Flyway and successful startup in the console.
+2. Open /lab9 and show Alice 1000.00, Bob 500.00, and four successful migrations.
+3. Run Successful transfer and read the result 900.00 / 600.00.
+4. Run Failure after debit. Explain why the flushed debit still rolls back.
+5. Compare Checked exception with Checked + rollbackFor.
+6. Compare REQUIRED audit count 0 with REQUIRES_NEW audit count 1 and transaction identifiers.
+7. Compare READ_COMMITTED and REPEATABLE_READ, including the independent connection identifiers.
+8. Run Stale update. Explain version 0 -> 1 and the rejected stale copy.
+9. Show the API's actual stale HTTP 409 response and Flyway lifecycle evidence from the report.
+
+## Questions and answers
+
+1. **What does @Transactional do, and where should boundaries go?** Spring normally intercepts an external call through a proxy, opens or joins a transaction, associates a persistence context and connection with it, then commits or rolls back when the call finishes. The boundary normally belongs around a complete service operation such as a transfer, so all its database changes succeed or fail together. Flush sends SQL but is not commit.
+2. **How do REQUIRED and REQUIRES_NEW differ?** REQUIRED participates in the current transaction or creates one when none exists. REQUIRES_NEW suspends the current transaction and starts an independent physical transaction. In our outer-failure experiment, REQUIRED leaves no audit row, while REQUIRES_NEW leaves one committed row. An independent transaction needs another connection and cannot depend on uncommitted data held by the suspended transaction.
+3. **Which anomalies are prevented by the two isolation levels?** PostgreSQL READ_COMMITTED prevents dirty reads, but permits a changed committed value on a second statement and can permit phantom reads. PostgreSQL REPEATABLE_READ uses a transaction snapshot, preventing nonrepeatable reads and phantom reads, while serialization anomalies remain possible. The SQL standard permits phantoms at repeatable read, so behavior must be described for the engine actually used. Our observations are PostgreSQL results, not a claim about every database.
+4. **How does @Version detect concurrent changes?** Hibernate includes the expected version in the update condition and increments the stored version. If another transaction has already advanced it, the stale update matches no row and raises an optimistic-lock failure. The failed transaction is rolled back. The API reports 409 and asks the caller to reload rather than silently overwrite newer data.
+5. **Why version-control migrations and keep them immutable?** Version control gives a reviewable record that travels with the application. Flyway records applied versions and checksums in flyway_schema_history. Editing a deployed version changes its checksum and makes validation fail, while different environments could otherwise interpret the same version differently. Add a new version for a change; do not rewrite the applied history.
+6. **When choose Flyway or Liquibase?** Flyway suits a small project that wants ordered, readable SQL migrations and direct control of database-specific DDL. Liquibase suits teams that benefit from structured changesets, contexts and labels, multiple changelog formats, and explicitly defined rollback operations. Neither choice removes the need to review deployment changes and recovery plans. We chose only Flyway for this schema.
+7. **What changes for a checked exception?** With the default rollback rule used here, an unchecked RuntimeException triggers rollback, while a checked exception does not automatically do so. rollbackFor=CheckedTransferException.class makes that checked failure roll back. Global rollback configuration can change defaults, so the project configuration and actual test are the evidence.
+8. **Why use JDBC in the isolation experiment?** A persistence context can return the same managed object on a second lookup without querying the database. Repeating SELECT through JDBC on the same reader transaction observes PostgreSQL's visibility rules directly. The writer uses REQUIRES_NEW and a different connection, and commits before the reader's second statement.
+9. **Why a separate audit bean?** A call through the audit bean's Spring proxy applies its propagation annotation. Calling an annotated inner method directly with this inside the same object normally skips proxy interception and cannot demonstrate an independent transaction correctly.
+10. **When are the other propagation modes useful?** SUPPORTS joins a transaction when present but permits a nontransactional call. MANDATORY requires a caller transaction. NOT_SUPPORTED suspends one, and NEVER rejects a transactional caller. NESTED uses savepoints only when the chosen transaction manager and resources support them; it is not an independent REQUIRES_NEW commit and should not be assumed to work for JPA in this project.
